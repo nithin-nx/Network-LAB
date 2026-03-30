@@ -1,45 +1,66 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#define port 5000
-#define maxline 500
-int main(){
-	int serv_sock;
-	char buffer[maxline];
-	struct sockaddr_in servaddr,cliaddr;
-	int len,i;
-	serv_sock=socket(AF_INET,SOCK_DGRAM,0);
-	if(serv_sock<0){
-		perror("Socket creation failed");
-		exit(1);
-	}
-	servaddr.sin_family=AF_INET;
-	servaddr.sin_port=htons(port);
-	servaddr.sin_addr.s_addr=INADDR_ANY;
-	if(bind(serv_sock,(struct sockaddr*)&servaddr,sizeof(servaddr))<0){
-		perror("Bind failed");
-		close(serv_sock);
-		exit(1);
-	}
-	printf("Server is waiting for message.....\n");
-	len=sizeof(cliaddr);
-	if(recvfrom(serv_sock,buffer,sizeof(buffer),0,(struct sockaddr*)&cliaddr,&len)<0){
-		perror("Receive failed");
-		close(serv_sock);
-		exit(1);
-	}
-	printf("Message from client :\n");
-	for(i=0;i<strlen(buffer);i++){
-		printf("%c",buffer[i]);
-	}
-	printf("\n");
-	if(sendto(serv_sock,buffer,sizeof(buffer),0,(struct sockaddr*)&cliaddr,len)<0){
-		perror("Send failed");
-		close(serv_sock);
-		exit(1);
-	}
-	close(serv_sock);
-	return 0;
+#include <sys/socket.h>
+
+#define PORT 5000
+#define MAXLINE 1000
+
+int main() 
+{
+    int sockfd;
+    char buffer[MAXLINE];
+    struct sockaddr_in servaddr, cliaddr;
+    socklen_t len;
+    int n;
+
+    // Create UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) 
+    {
+        perror("Socket creation failed");
+        return 1;
+    }
+
+    // Clear addresses
+    memset(&servaddr, 0, sizeof(servaddr));
+    memset(&cliaddr, 0, sizeof(cliaddr));
+
+    // Server address
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(PORT);
+
+    // Bind socket
+    if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) 
+    {
+        perror("Bind failed");
+        close(sockfd);
+        return 1;
+    }
+
+    printf("UDP Echo Server running on port %d...\n", PORT);
+
+    len = sizeof(cliaddr);
+
+    // Receive message
+    n = recvfrom(sockfd, buffer, MAXLINE, 0,(struct sockaddr *)&cliaddr, &len);
+
+    if (n < 0) 
+    {
+        perror("Receive failed");
+        close(sockfd);
+        return 1;
+    }
+
+    buffer[n] = '\0';
+    printf("Received: %s\n", buffer);
+
+    // Echo back the same message
+    sendto(sockfd, buffer, n, 0,
+           (struct sockaddr *)&cliaddr, len);
+
+    close(sockfd);
+    return 0;
 }

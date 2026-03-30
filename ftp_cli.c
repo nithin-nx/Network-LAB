@@ -1,84 +1,100 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-int main(){
-	int clisocket;
-	struct sockaddr_in servaddr;
-	char buffer[200],newbuffer[200],filename[20];
-	FILE *fp;
-	clisocket=socket(AF_INET,SOCK_STREAM,0);
-	if(clisocket<0){
-		perror("Socket creation failed");
-		exit(1);
-	}
-	servaddr.sin_port=htons(8080);
-	servaddr.sin_family=AF_INET;
-	servaddr.sin_addr.s_addr=inet_addr("127.0.0.1");
-	if(connect(clisocket,(struct sockaddr*)&servaddr,sizeof(servaddr))<0){
-		perror("Connection failed");
-		close(clisocket);
-		exit(1);
-	}
-	printf("Enter the command\n");
-	if(scanf("%s",buffer)<=0){
-		perror("Input failed");
-		close(clisocket);
-		exit(1);
-	}
-	printf("Enter the filename\n");
-	if(scanf("%s",filename)<=0){
-		perror("Input failed");
-		close(clisocket);
-		exit(1);
-	}
-	if(send(clisocket,buffer,sizeof(buffer),0)<0){
-		perror("Send failed");
-		close(clisocket);
-		exit(1);
-	}
-	if(send(clisocket,filename,sizeof(filename),0)<0){
-		perror("Send failed");
-		close(clisocket);
-		exit(1);
-	}
-	if(strcmp(buffer,"GET")==0){
-		if(recv(clisocket,newbuffer,sizeof(newbuffer),0)<0){
-			perror("Receive failed");
-			close(clisocket);
-			exit(1);
-		}
-		if(strcmp(newbuffer,"ERROR")==0){
-    			printf("File not found on server\n");
-		}
-		else{
-			fp=fopen(filename,"w");
-			fputs(newbuffer,fp);
-			fclose(fp);
-			printf("File downloaded\n");
-			printf("\n");
-		}
-	}
-	else if(strcmp(buffer,"PUT")==0){
-		fp=fopen(filename,"r");
-		if(fp==NULL){
-			strcpy(newbuffer,"ERROR");
-			send(clisocket,newbuffer,sizeof(newbuffer),0);
-			close(clisocket);
-			exit(1);
-		}
-		fgets(newbuffer,sizeof(newbuffer),fp);
-		if(send(clisocket,newbuffer,sizeof(newbuffer),0)<0){
-			perror("Send failed");
-			fclose(fp);
-			close(clisocket);
-			exit(1);
-		}
-		fclose(fp);
-		printf("File uploaded\n");
-		printf("\n");
-	}
-	close(clisocket);
+#include <netdb.h>
+
+#define BUF_SIZE 1024
+
+void error(const char *msg) {
+    perror(msg);
+    exit(1);
+}
+
+int main(int argc, char *argv[]) {
+    int sockfd, port, n;
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+    char command[10], filename[256], buffer[BUF_SIZE];
+    FILE *fp;
+
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <host> <port>\n", argv[0]);
+        exit(1);
+    }
+
+    port = atoi(argv[2]);
+
+    // Create TCP socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) error("Socket creation failed");
+
+    // Get server IP from hostname
+    server = gethostbyname(argv[1]);
+    if (!server) error("No such host");
+
+    // Configure server address
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+    serv_addr.sin_port = htons(port);
+
+    // Connect to server
+    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+        error("Connection failed");
+
+    printf("Enter command (get/put): ");
+    scanf("%9s", command);
+    printf("Enter filename: ");
+    scanf("%255s", filename);
+
+    snprintf(buffer, BUF_SIZE, "%s %s", command, filename);
+
+    // Send command to server
+    write(sockfd, buffer, strlen(buffer));
+
+    memset(buffer, 0, BUF_SIZE);
+
+    // Receive server response
+    read(sockfd, buffer, BUF_SIZE);
+
+    if (strncmp(buffer, "ERROR", 5) == 0) {
+        printf("Server error\n");
+        close(sockfd);
+        return 0;
+    }
+
+    // GET
+    if (strcmp(command, "get") == 0) {
+        fp = fopen(filename, "wb");
+        if (!fp) error("File open failed");
+
+        while ((n = read(sockfd, buffer, BUF_SIZE)) > 0) {
+            fwrite(buffer, 1, n, fp);  // Receive file data
+        }
+
+        fclose(fp);
+        printf("Download successful\n");
+    }
+
+    // PUT
+    else if (strcmp(command, "put") == 0) {
+        fp = fopen(filename, "rb");
+        if (!fp) {
+            printf("File not found\n");
+            close(sockfd);
+            return 0;
+        }
+
+        while ((n = fread(buffer, 1, BUF_SIZE, fp)) > 0) {
+            write(sockfd, buffer, n);  // Send file data
+        }
+
+        fclose(fp);
+        printf("Upload successful\n");
+    }
+
+    close(sockfd);  // Close socket
     return 0;
 }

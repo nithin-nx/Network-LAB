@@ -1,43 +1,65 @@
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include<unistd.h>
-#include<arpa/inet.h>
-#define maxlen 200
-int main(){
-	int cli_sock;
-	char buffer[maxlen];
-	struct sockaddr_in serv_addr;
-	cli_sock=socket(AF_INET,SOCK_STREAM,0);
-	if(cli_sock<0){
-		perror("Socket creation failed");
-		exit(1);
-	}
-	serv_addr.sin_family=AF_INET;
-	serv_addr.sin_port=htons(5000);
-	serv_addr.sin_addr.s_addr=inet_addr("127.0.0.1");
-	if(connect(cli_sock,(struct sockaddr*)&serv_addr,sizeof(serv_addr))<0){
-		perror("Connection failed");
-		close(cli_sock);
-		exit(1);
-	}
-	printf("Enter the message to server:\n");
-	if(scanf("%s",buffer)<=0){
-		perror("Input failed");
-		close(cli_sock);
-		exit(1);
-	}
-	printf("\n");
-	if(send(cli_sock,buffer,sizeof(buffer),0)<0){
-		perror("Send failed");
-		close(cli_sock);
-		exit(1);
-	}
-	if(recv(cli_sock,buffer,sizeof(buffer),0)<0){
-		perror("Receive failed");
-		close(cli_sock);
-		exit(1);
-	}
-	close(cli_sock);
-	return 0;	
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
+#define PORT 5000
+#define MAXLINE 1024
+
+int main() 
+{
+    int sockfd;
+    struct sockaddr_in servaddr;
+    char buffer[MAXLINE];
+    char message[MAXLINE];
+    int n;
+
+    // Create TCP socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) 
+    {
+        perror("Socket creation failed");
+        return 1;
+    }
+
+    // Clear server address
+    memset(&servaddr, 0, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(PORT);
+    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    // Connect to server
+    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) 
+    {
+        perror("Connect failed");
+        return 1;
+    }
+
+    printf("Connected to server. Type messages to send:\n");
+
+    while (1) 
+    {
+        printf("Enter message: ");
+        fgets(message, MAXLINE, stdin);
+
+        // Remove newline
+        message[strcspn(message, "\n")] = 0;
+
+        write(sockfd, message, strlen(message));
+
+        n = read(sockfd, buffer, MAXLINE);
+        if (n <= 0) 
+        {
+            printf("Server disconnected.\n");
+            break;
+        }
+
+        buffer[n] = '\0';
+        printf("Echo from server: %s\n", buffer);
+    }
+
+    close(sockfd);
+    return 0;
 }

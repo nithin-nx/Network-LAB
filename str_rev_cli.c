@@ -1,46 +1,43 @@
 #include <stdio.h>
 #include <string.h>
-#include<stdlib.h>
-#include<unistd.h>
-#include<arpa/inet.h>
-#define port 5000
-#define maxlen 500
-int main(){
-	int client_socket;
-	struct sockaddr_in servaddr;
-	char buffer[maxlen];
-	client_socket=socket(AF_INET,SOCK_STREAM,0);
-	if(client_socket<0){
-		perror("Socket creation failed");
-		exit(1);
-	}
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(port);
-	servaddr.sin_addr.s_addr=inet_addr("127.0.0.1");
-	if(connect(client_socket,(struct sockaddr*)&servaddr,sizeof(servaddr))<0){
-		perror("Connection failed");
-		close(client_socket);
-		exit(1);
-	}
-	printf("Enter the string:\n");
-	if(scanf("%s",buffer)<=0){
-		perror("Input failed");
-		close(client_socket);
-		exit(1);
-	}
-	if(send(client_socket,buffer,sizeof(buffer),0)<0){
-		perror("Send failed");
-		close(client_socket);
-		exit(1);
-	}
-	if(recv(client_socket,buffer,sizeof(buffer),0)<0){
-		perror("Receive failed");
-		close(client_socket);
-		exit(1);
-	}
-	printf("The reversed string is:");
-	printf("%s",buffer);
-	printf("\n");
-	close(client_socket);
-	return 0;
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8080
+#define MAX 1024
+
+int main() 
+{
+    int sock;
+    struct sockaddr_in server_addr;
+    char buffer[MAX];
+
+    // Create a TCP socket (IPv4 + stream-based)
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    // Set server address details (IP + Port)
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);                 // Convert port to network byte order
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Convert IP string to binary form
+
+    // Establish connection to the server
+    connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
+
+    // Send data to the server
+    fgets(buffer, MAX, stdin);
+    buffer[strcspn(buffer, "\n")] = '\0';
+    write(sock, buffer, strlen(buffer));
+
+    // Receive response from the server
+    memset(buffer, 0, MAX);
+    read(sock, buffer, MAX);
+
+    // Display server response
+    printf("%s\n", buffer);
+
+    // Close the socket connection
+    close(sock);
+
+    return 0;
 }

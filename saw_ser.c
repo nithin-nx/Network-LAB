@@ -1,70 +1,111 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <time.h>
-#define max 999
-#define MAX 20
-int main(){
-	int clisocket,servsocket;
-	struct sockaddr_in servaddr;
-	int frame,ack;
-	servsocket=socket(AF_INET,SOCK_STREAM,0);
-	if(servsocket < 0){
-		perror("Socket creation failed");
-		exit(1);
-	}
-	servaddr.sin_family=AF_INET;
-	servaddr.sin_port=htons(9000);
-	servaddr.sin_addr.s_addr=INADDR_ANY;
-	if(bind(servsocket,(struct sockaddr*)&servaddr,sizeof(servaddr))< 0){
-		perror("Bind failed");
-		close(servsocket);
-		exit(1);
-	}
-	if(listen(servsocket,5)< 0){
-		perror("Listen failed");
-		close(servsocket);
-		exit(1);
-	}
-	srand(time(0));
-	printf("Server is waiting for connection...\n");
-	clisocket=accept(servsocket,NULL,NULL);
-	if(clisocket < 0){
-		perror("Accept failed");
-		close(servsocket);
-		exit(1);
-	}
 
-	while(1){
-		if(recv(clisocket,&frame,sizeof(frame),0) < 0){
-			perror("Receive failed");
-			break;
-		}
+#define MAX 100
+#define PORT 8080
 
-		printf("Frame %d received \n",frame);
-		if(rand()%5 == 0){
-			printf("ACK is lost\n");
-			ack=-1;
-			printf("Retransmitting frame %d\n",frame);
+int is_in_list(int frame, int list[], int size, int *index) {
+    for (int i = 0; i < size; i++) {
+        if (list[i] == frame) {
+            *index = i;
+            return 1;
+        }
+    }
+    return 0;
+}
 
-			if(send(clisocket,&ack,sizeof(ack),0) < 0){
-				perror("Send failed");
-				break;
-			}
-		}
-		else{
-			ack=(frame+1)%2;
-			printf("Sending ACK %d\n",ack);
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s <total_frames>\n", argv[0]);
+        return 1;
+    }
 
-			if(send(clisocket,&ack,sizeof(ack),0) < 0){
-				perror("Send failed");
-				break;
-			}
-		}
-	}
-	close(clisocket);
-	close(servsocket);
-	return 0;
+    int total_frames = atoi(argv[1]);
+    int sockfd;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+
+    int lost_list[MAX], timeout_list[MAX];
+    int num_lost, num_timeout;
+
+    // Create a UDP socket (IPv4 + datagram-based communication)
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket error");
+        exit(1);
+    }
+
+    // Configure server address (IP + Port)
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);        // Convert port to network byte order
+    server_addr.sin_addr.s_addr = INADDR_ANY;  // Accept data from any interface
+
+    // Bind socket to the specified port (required for receiving data)
+    if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Bind failed");
+        exit(1);
+    }
+
+    printf("Enter number of lost frames: ");
+    scanf("%d", &num_lost);
+    for (int i = 0; i < num_lost; i++)
+        scanf("%d", &lost_list[i]);
+
+    printf("Enter number of timeout frames: ");
+    scanf("%d", &num_timeout);
+    for (int i = 0; i < num_timeout; i++)
+        scanf("%d", &timeout_list[i]);
+
+    int next_frame = 0;
+
+    while (next_frame < total_frames) {
+        int recv_frame;
+
+        // Receive a frame from client (UDP is connectionless)
+        int n = recvfrom(sockfd, &recv_frame, sizeof(recv_frame), 0,
+                         (struct sockaddr*)&client_addr, &addr_len);
+
+        if (n < 0) {
+            perror("recvfrom error");
+            continue;
+        }
+
+        printf("Received Frame: %d\n", recv_frame);
+
+        int index;
+
+        if (is_in_list(recv_frame, lost_list, num_lost, &index)) {
+            int nak = -1;
+
+            // Send NAK (Negative Acknowledgement) to client
+            sendto(sockfd, &nak, sizeof(nak), 0,
+                   (struct sockaddr*)&client_addr, addr_len);
+
+            printf("Sent NAK for Frame %d\n", recv_frame);
+            lost_list[index] = -999;
+
+        } else if (is_in_list(recv_frame, timeout_list, num_timeout, &index)) {
+            // Simulate timeout (no response sent)
+            printf("Simulating Timeout for Frame %d\n", recv_frame);
+            timeout_list[index] = -999;
+
+        } else {
+            next_frame = recv_frame + 1;
+
+            // Send ACK (Acknowledgement) with next expected frame
+            sendto(sockfd, &next_frame, sizeof(next_frame), 0,
+                   (struct sockaddr*)&client_addr, addr_len);
+
+            printf("Sent ACK: %d\n", next_frame);
+        }
+    }
+
+    // Close UDP socket
+    close(sockfd);
+
+    return 0;
 }

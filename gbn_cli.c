@@ -2,50 +2,74 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <time.h>
-int main()
-{
-    int clisocket;
-    struct sockaddr_in servaddr;
-    int n,i,ack,frame;
-    srand(time(0));
-    clisocket = socket(AF_INET,SOCK_STREAM,0);
-    if(clisocket < 0){
-        perror("Socket creation failed");
+#include <string.h>
+
+#define PORT 8080
+#define WINDOW_SIZE 4
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s <total_frames>\n", argv[0]);
+        return 1;
+    }
+
+    int total_frames = atoi(argv[1]);
+
+    int sockfd;
+    struct sockaddr_in server_addr;
+    socklen_t addr_len = sizeof(server_addr);
+
+    // Create UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket error");
         exit(1);
     }
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(9000);
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    if(connect(clisocket,(struct sockaddr*)&servaddr,sizeof(servaddr)) < 0){
-        perror("Connection failed");
-        close(clisocket);
-        exit(1);
+
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    // Configure server address
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    // Set timeout for receiving ACK
+    struct timeval tv;
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    int base = 0;
+    int next_seq = 0;
+
+    while (base < total_frames) {
+
+        // Send frames in window
+        while (next_seq < base + WINDOW_SIZE && next_seq < total_frames) {
+            printf("Sending Frame: %d\n", next_seq);
+
+            sendto(sockfd, &next_seq, sizeof(next_seq), 0,
+                   (struct sockaddr*)&server_addr, addr_len);
+
+            next_seq++;
+        }
+
+        int ack;
+
+        // Receive ACK from server
+        int n = recvfrom(sockfd, &ack, sizeof(ack), 0, NULL, NULL);
+
+        if (n < 0) {
+            printf("Timeout! Resending from Frame %d\n", base);
+
+            next_seq = base;  // Go-Back-N retransmission
+            continue;
+        }
+
+        printf("Received ACK: %d\n", ack);
+        base = ack;   // Move window (cumulative ACK)
     }
-	printf("Enter the window size:\n");
-	if(scanf("%d",&n) <= 0){
-		perror("Input failed");
-		close(clisocket);
-		exit(1);
-	}
-	for(i=0;i<n;i++){
-		printf("Sending frame %d\n",i);
-		if(send(clisocket,&frame,sizeof(frame),0) < 0){
-			perror("Send failed");
-			break;
-		}
-		if(rand()%4==0){
-			printf("ACK lost for frame %d\n",i);
-			printf("Retransmitting frame %d\n",i);
-			i--;
-			continue;
-		}
-		if(recv(clisocket,&ack,sizeof(ack),0) < 0){
-			perror("Receive failed");
-			break;
-		}
-		printf("ACK %d received\n",ack);
-	}
-    close(clisocket);
+
+    close(sockfd);  // Close socket
     return 0;
 }
