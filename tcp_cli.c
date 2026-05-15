@@ -1,65 +1,35 @@
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
+#include<stdio.h>
+#include<string.h>
+#include<unistd.h>
+#include<arpa/inet.h>
 
-#define PORT 5000
-#define MAXLINE 1024
-
-int main() 
+int main()
 {
-    int sockfd;
-    struct sockaddr_in servaddr;
-    char buffer[MAXLINE];
-    char message[MAXLINE];
-    int n;
+    int s,n;
+    char b[1024],m[1024];
+    struct sockaddr_in a;
 
-    // Create TCP socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) 
+    s=socket(AF_INET,SOCK_STREAM,0);
+
+    a.sin_family=AF_INET;
+    a.sin_port=htons(5000);
+    a.sin_addr.s_addr=inet_addr("127.0.0.1");
+
+    connect(s,(struct sockaddr*)&a,sizeof(a));
+	
+	printf("Server connected\n");
+
+    while(1)
     {
-        perror("Socket creation failed");
-        return 1;
+        fgets(m,1024,stdin);
+
+        write(s,m,strlen(m));
+
+        n=read(s,b,1024);
+        b[n]=0;
+
+        printf("Echo: %s",b);
     }
-
-    // Clear server address
-    memset(&servaddr, 0, sizeof(servaddr));
-
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(PORT);
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    // Connect to server
-    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) 
-    {
-        perror("Connect failed");
-        return 1;
-    }
-
-    printf("Connected to server. Type messages to send:\n");
-
-    while (1) 
-    {
-        printf("Enter message: ");
-        fgets(message, MAXLINE, stdin);
-
-        // Remove newline
-        message[strcspn(message, "\n")] = 0;
-
-        write(sockfd, message, strlen(message));
-
-        n = read(sockfd, buffer, MAXLINE);
-        if (n <= 0) 
-        {
-            printf("Server disconnected.\n");
-            break;
-        }
-
-        buffer[n] = '\0';
-        printf("Echo from server: %s\n", buffer);
-    }
-
-    close(sockfd);
-    return 0;
+	
+    close(s);
 }
