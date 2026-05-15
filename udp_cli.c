@@ -1,55 +1,35 @@
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
+#include<stdio.h>
+#include<string.h>
+#include<unistd.h>
+#include<arpa/inet.h>
 
-#define PORT 5000
-#define MAXLINE 1000
-
-int main() 
+int main()
 {
-    int sockfd;
-    char buffer[MAXLINE];
-    char message[MAXLINE];
-    struct sockaddr_in servaddr;
-    socklen_t len;
+    int s,n;
+    char b[1000],m[1000];
+    struct sockaddr_in a;
+    socklen_t l;
 
-    // Create UDP socket
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) 
-    {
-        perror("Socket creation failed");
-        return 1;
-    }
+    s=socket(AF_INET,SOCK_DGRAM,0);
 
-    // Clear server address
-    memset(&servaddr, 0, sizeof(servaddr));
+    a.sin_family=AF_INET;
+    a.sin_port=htons(5000);
+    a.sin_addr.s_addr=inet_addr("127.0.0.1");
 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(PORT);
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // localhost
+    printf("Connected to server\n");
 
-    printf("Enter message: ");
-    fgets(message, MAXLINE, stdin);
+    printf("Message: ");
+    fgets(m,1000,stdin);
 
-    // Send message to server
-    sendto(sockfd, message, strlen(message), 0,(struct sockaddr *)&servaddr, sizeof(servaddr));
+    sendto(s,m,strlen(m),0,(struct sockaddr*)&a,sizeof(a));
 
-    // Receive echoed message
-    len = sizeof(servaddr);
-    int n = recvfrom(sockfd, buffer, MAXLINE, 0,(struct sockaddr *)&servaddr, &len);
+    l=sizeof(a);
 
-    if (n < 0) 
-    {
-        perror("Receive failed");
-        close(sockfd);
-        return 1;
-    }
+    n=recvfrom(s,b,1000,0,(struct sockaddr*)&a,&l);
 
-    buffer[n] = '\0';
-    printf("Echo from server: %s", buffer);
+    b[n]=0;
 
-    close(sockfd);
-    return 0;
+    printf("Echo: %s",b);
+
+    close(s);
 }

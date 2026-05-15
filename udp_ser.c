@@ -1,66 +1,38 @@
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
+#include<stdio.h>
+#include<string.h>
+#include<unistd.h>
+#include<arpa/inet.h>
 
-#define PORT 5000
-#define MAXLINE 1000
-
-int main() 
+int main()
 {
-    int sockfd;
-    char buffer[MAXLINE];
-    struct sockaddr_in servaddr, cliaddr;
-    socklen_t len;
-    int n;
+    int s,n;
+    char b[1000];
+    struct sockaddr_in a,c;
+    socklen_t l;
 
-    // Create UDP socket
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) 
-    {
-        perror("Socket creation failed");
-        return 1;
-    }
+    s=socket(AF_INET,SOCK_DGRAM,0);
 
-    // Clear addresses
-    memset(&servaddr, 0, sizeof(servaddr));
-    memset(&cliaddr, 0, sizeof(cliaddr));
+    a.sin_family=AF_INET;
+    a.sin_port=htons(5000);
+    a.sin_addr.s_addr=INADDR_ANY;
 
-    // Server address
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(PORT);
+    bind(s,(struct sockaddr*)&a,sizeof(a));
 
-    // Bind socket
-    if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) 
-    {
-        perror("Bind failed");
-        close(sockfd);
-        return 1;
-    }
+    printf("Client waiting...\n");
 
-    printf("UDP Echo Server running on port %d...\n", PORT);
+    l=sizeof(c);
 
-    len = sizeof(cliaddr);
+    n=recvfrom(s,b,1000,0,(struct sockaddr*)&c,&l);
 
-    // Receive message
-    n = recvfrom(sockfd, buffer, MAXLINE, 0,(struct sockaddr *)&cliaddr, &len);
+    printf("Client connected\n");
 
-    if (n < 0) 
-    {
-        perror("Receive failed");
-        close(sockfd);
-        return 1;
-    }
+    b[n]=0;
 
-    buffer[n] = '\0';
-    printf("Received: %s\n", buffer);
+    printf("Message: %s",b);
 
-    // Echo back the same message
-    sendto(sockfd, buffer, n, 0,
-           (struct sockaddr *)&cliaddr, len);
+    sendto(s,b,n,0,(struct sockaddr*)&c,l);
 
-    close(sockfd);
-    return 0;
+    printf("Client disconnected\n");
+
+    close(s);
 }
