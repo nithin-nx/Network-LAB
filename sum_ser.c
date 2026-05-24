@@ -1,43 +1,32 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include<stdio.h>
+#include<string.h>
+#include<unistd.h>
+#include<arpa/inet.h>
+#include<sys/socket.h>
 
-#define PORT 8080
+int main()
+{
+    int s,n,m[2],sum;
+   
+    struct sockaddr_in a;
+    socklen_t l;
 
-int main() {
-    int sock;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t addr_len = sizeof(client_addr);
-    int nums[2], sum;
+    s=socket(AF_INET,SOCK_DGRAM,0);
 
-    // Create UDP socket
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    a.sin_family=AF_INET;
+    a.sin_port=htons(5000);
+    a.sin_addr.s_addr=INADDR_ANY;
 
-    // Configure server address
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;   // Accept from any IP
-    server_addr.sin_port = htons(PORT);         // Port in network byte order
+    bind(s,(struct sockaddr*)&a,sizeof(a));
 
-    // Bind socket to port
-    bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    l= sizeof(a);
+    recvfrom(s,m,sizeof(m),0,(struct sockaddr*)&a,&l);
+    
+	printf("Message: %d %d",m[0],m[1]);
+	sum = m[0] + m[1];
+	
+    sendto(s,&sum,sizeof(sum),0,(struct sockaddr*)&a,l);
 
-    printf("Server ready on port %d\n", PORT);
 
-    // Receive data from client
-    recvfrom(sock, nums, sizeof(nums), 0,
-             (struct sockaddr *)&client_addr, &addr_len);
-
-    // Process data
-    sum = nums[0] + nums[1];
-
-    // Send result back to client
-    sendto(sock, &sum, sizeof(sum), 0,
-           (struct sockaddr *)&client_addr, addr_len);
-
-    // Close socket
-    close(sock);
-
-    return 0;
+    close(s);
 }

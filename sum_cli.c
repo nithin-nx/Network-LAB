@@ -1,43 +1,31 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include<stdio.h>
+#include<string.h>
+#include<unistd.h>
+#include<arpa/inet.h>
+#include<sys/socket.h>
 
-#define PORT 8080
+int main()
+{
+    int s,n,m[2],sum;
+    
+    struct sockaddr_in a;
+    socklen_t l;
 
-int main() {
-    int sock;
-    struct sockaddr_in server_addr;
-    socklen_t addr_len = sizeof(server_addr);
-    int nums[2], sum;
+    s=socket(AF_INET,SOCK_DGRAM,0);
 
-    // Create UDP socket
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    a.sin_family=AF_INET;
+    a.sin_port=htons(5000);
+    a.sin_addr.s_addr=INADDR_ANY;
 
-    // Configure server address (localhost)
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    printf("enter number");
+    scanf("%d%d",&m[0],&m[1]);
+    
+	l= sizeof(a);
+    sendto(s,m,sizeof(m),0,(struct sockaddr*)&a,l);
 
-    printf("Enter two numbers: ");
-    scanf("%d %d", &nums[0], &nums[1]);
+    recvfrom(s,&sum,sizeof(sum),0,(struct sockaddr*)&a,&l);
+    
+    printf("Echo: %d",sum);
 
-    // Send data to server
-    sendto(sock, nums, sizeof(nums), 0,
-           (struct sockaddr *)&server_addr, addr_len);
-
-    printf("Message sent to server\n");
-
-    // Receive result from server
-    recvfrom(sock, &sum, sizeof(sum), 0,
-             (struct sockaddr *)&server_addr, &addr_len);
-
-    printf("Reply received from server\n");
-    printf("Sum = %d\n", sum);
-
-    // Close socket
-    close(sock);
-
-    return 0;
+    close(s);
 }
