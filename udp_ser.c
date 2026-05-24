@@ -2,12 +2,13 @@
 #include<string.h>
 #include<unistd.h>
 #include<arpa/inet.h>
+#include<sys/socket.h>
 
 int main()
 {
     int s,n;
     char b[1000];
-    struct sockaddr_in a,c;
+    struct sockaddr_in a;
     socklen_t l;
 
     s=socket(AF_INET,SOCK_DGRAM,0);
@@ -18,21 +19,12 @@ int main()
 
     bind(s,(struct sockaddr*)&a,sizeof(a));
 
-    printf("Client waiting...\n");
-
-    l=sizeof(c);
-
-    n=recvfrom(s,b,1000,0,(struct sockaddr*)&c,&l);
-
-    printf("Client connected\n");
-
+    l= sizeof(a);
+    n=recvfrom(s,b,1000,0,(struct sockaddr*)&a,&l);
     b[n]=0;
+	printf("Message: %s",b);
+    sendto(s,b,n,0,(struct sockaddr*)&a,l);
 
-    printf("Message: %s",b);
-
-    sendto(s,b,n,0,(struct sockaddr*)&c,l);
-
-    printf("Client disconnected\n");
 
     close(s);
 }

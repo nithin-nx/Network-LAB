@@ -2,6 +2,7 @@
 #include<string.h>
 #include<unistd.h>
 #include<arpa/inet.h>
+#include<sys/socket.h>
 
 int main()
 {
@@ -14,21 +15,16 @@ int main()
 
     a.sin_family=AF_INET;
     a.sin_port=htons(5000);
-    a.sin_addr.s_addr=inet_addr("127.0.0.1");
+    a.sin_addr.s_addr=INADDR_ANY;
 
     printf("Connected to server\n");
 
-    printf("Message: ");
     fgets(m,1000,stdin);
-
-    sendto(s,m,strlen(m),0,(struct sockaddr*)&a,sizeof(a));
-
-    l=sizeof(a);
+	l= sizeof(a);
+    sendto(s,m,strlen(m),0,(struct sockaddr*)&a,l);
 
     n=recvfrom(s,b,1000,0,(struct sockaddr*)&a,&l);
-
     b[n]=0;
-
     printf("Echo: %s",b);
 
     close(s);
