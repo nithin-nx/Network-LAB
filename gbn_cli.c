@@ -1,75 +1,50 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <string.h>
+#include<stdio.h>
+#include<unistd.h>
+#include<arpa/inet.h>
 
-#define PORT 8080
-#define WINDOW_SIZE 4
+#define W 4
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Usage: %s <total_frames>\n", argv[0]);
-        return 1;
-    }
+int main()
+{
+    int s,total,base=0,next=0,ack;
 
-    int total_frames = atoi(argv[1]);
+    struct sockaddr_in a;
+    socklen_t l;
 
-    int sockfd;
-    struct sockaddr_in server_addr;
-    socklen_t addr_len = sizeof(server_addr);
+    s=socket(AF_INET,SOCK_DGRAM,0);
 
-    // Create UDP socket
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("Socket error");
-        exit(1);
-    }
+    a.sin_family=AF_INET;
+    a.sin_port=htons(5000);
+    a.sin_addr.s_addr=inet_addr("127.0.0.1");
 
-    memset(&server_addr, 0, sizeof(server_addr));
+    printf("Enter total frames: ");
+    scanf("%d",&total);
 
-    // Configure server address
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    l=sizeof(a);
 
-    // Set timeout for receiving ACK
-    struct timeval tv;
-    tv.tv_sec = 2;
-    tv.tv_usec = 0;
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    while(base<total)
+    {
+        while(next<base+W && next<total)
+        {
+            printf("Sending %d\n",next);
 
-    int base = 0;
-    int next_seq = 0;
+            sendto(s,&next,sizeof(next),0,
+                  (struct sockaddr*)&a,l);
 
-    while (base < total_frames) {
+            recvfrom(s,&ack,sizeof(ack),0,NULL,NULL);
 
-        // Send frames in window
-        while (next_seq < base + WINDOW_SIZE && next_seq < total_frames) {
-            printf("Sending Frame: %d\n", next_seq);
+            printf("ACK %d received\n",ack);
 
-            sendto(sockfd, &next_seq, sizeof(next_seq), 0,
-                   (struct sockaddr*)&server_addr, addr_len);
+            base=ack;
 
-            next_seq++;
+            next++;
         }
-
-        int ack;
-
-        // Receive ACK from server
-        int n = recvfrom(sockfd, &ack, sizeof(ack), 0, NULL, NULL);
-
-        if (n < 0) {
-            printf("Timeout! Resending from Frame %d\n", base);
-
-            next_seq = base;  // Go-Back-N retransmission
-            continue;
-        }
-
-        printf("Received ACK: %d\n", ack);
-        base = ack;   // Move window (cumulative ACK)
     }
 
-    close(sockfd);  // Close socket
-    return 0;
+    next=-1;
+
+    sendto(s,&next,sizeof(next),0,
+          (struct sockaddr*)&a,l);
+
+    close(s);
 }
