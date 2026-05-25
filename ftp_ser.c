@@ -1,103 +1,60 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include<stdio.h>
+#include<string.h>
+#include<arpa/inet.h>
+#include<unistd.h>
 
-#define BUF_SIZE 1024
+int main()
+{
+    int s,c,n;
 
-void error(const char *msg) {
-    perror(msg);
-    exit(1);
-}
+    char b[1024],cmd[20],f[100];
 
-int main(int argc, char *argv[]) {
-    int sockfd, newsockfd, port, n;
-    socklen_t clilen;
-    char buffer[BUF_SIZE], command[10], filename[256];
-    struct sockaddr_in serv_addr, cli_addr;
     FILE *fp;
 
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <port>\n", argv[0]);
-        exit(1);
-    }
+    struct sockaddr_in a;
 
-    // Create TCP socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) error("Socket error");
+    s = socket(AF_INET, SOCK_STREAM, 0);
 
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    port = atoi(argv[1]);
+    a.sin_family = AF_INET;
+    a.sin_port = htons(5000);
+    a.sin_addr.s_addr = INADDR_ANY;
 
-    // Configure server address
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(port);
+    bind(s, (struct sockaddr*)&a, sizeof(a));
 
-    // Bind socket to port
-    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        error("Bind failed");
+    listen(s, 5);
 
-    // Listen for incoming connections
-    listen(sockfd, 5);
-    printf("FTP Server started...\n");
+    while(1)
+    {
+        c = accept(s, NULL, NULL);
 
-    clilen = sizeof(cli_addr);
+        n = read(c, b, 1024);
+        b[n] = 0;
+        sscanf(b, "%s %s", cmd, f);
 
-    while (1) {
-        // Accept client connection
-        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-        if (newsockfd < 0) error("Accept failed");
-
-        printf("Client connected\n");
-
-        memset(buffer, 0, BUF_SIZE);
-
-        // Receive command from client
-        read(newsockfd, buffer, BUF_SIZE);
-
-        sscanf(buffer, "%s %s", command, filename);
-
-        // GET
-        if (strcmp(command, "get") == 0) {
-            fp = fopen(filename, "rb");
-
-            if (!fp) {
-                write(newsockfd, "ERROR\n", 6);
-            } else {
-                write(newsockfd, "OK\n", 3);
-
-                while ((n = fread(buffer, 1, BUF_SIZE, fp)) > 0) {
-                    write(newsockfd, buffer, n);  // Send file data
-                }
-
-                fclose(fp);
-                printf("File sent: %s\n", filename);
+        if(strcmp(cmd, "get") == 0)
+        {
+            fp = fopen(f, "rb");
+            while((n = fread(b, 1, 1024, fp)) > 0)
+            {
+                write(c, b, n);
             }
+            fclose(fp);
+            printf("Sent\n");
         }
 
-        // PUT
-        else if (strcmp(command, "put") == 0) {
-            fp = fopen(filename, "wb");
-
-            if (!fp) {
-                write(newsockfd, "ERROR\n", 6);
-            } else {
-                write(newsockfd, "OK\n", 3);
-
-                while ((n = read(newsockfd, buffer, BUF_SIZE)) > 0) {
-                    fwrite(buffer, 1, n, fp);  // Receive file data
-                }
-
-                fclose(fp);
-                printf("File received: %s\n", filename);
+        else
+        {
+            fp = fopen(f, "wb");
+            while((n = read(c, b, 1024)) > 0)
+            {
+                fwrite(b, 1, n, fp);
             }
+            fclose(fp);
+            printf("Received\n");
         }
-
-        close(newsockfd);  // Close client socket
+        close(c);
     }
-
-    close(sockfd);  // Close server socket
+    close(s);
+    
     return 0;
 }

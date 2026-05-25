@@ -1,6 +1,5 @@
 #include<stdio.h>
 
-#define INF 9999
 
 int main()
 {
@@ -31,7 +30,7 @@ int main()
 
     for(i=1;i<n;i++)
     {
-        min=INF;
+        min=9999;
 
         for(j=0;j<n;j++)
             if(!v[j]&&d[j]<min)

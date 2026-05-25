@@ -20,11 +20,12 @@ int main()
     printf("Connected to server\n");
 
     fgets(m,1000,stdin);
+    
 	l= sizeof(a);
-    sendto(s,m,strlen(m),0,(struct sockaddr*)&a,l);
+    sendto(s,m,1000,0,(struct sockaddr*)&a,l);
 
-    n=recvfrom(s,b,1000,0,(struct sockaddr*)&a,&l);
-    b[n]=0;
+    recvfrom(s,b,1000,0,(struct sockaddr*)&a,&l);
+    
     printf("Echo: %s",b);
 
     close(s);

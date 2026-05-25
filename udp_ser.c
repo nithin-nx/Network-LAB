@@ -20,10 +20,10 @@ int main()
     bind(s,(struct sockaddr*)&a,sizeof(a));
 
     l= sizeof(a);
-    n=recvfrom(s,b,1000,0,(struct sockaddr*)&a,&l);
-    b[n]=0;
+    recvfrom(s,b,1000,0,(struct sockaddr*)&a,&l);
+ 
 	printf("Message: %s",b);
-    sendto(s,b,n,0,(struct sockaddr*)&a,l);
+    sendto(s,b,1000,0,(struct sockaddr*)&a,l);
 
 
     close(s);
