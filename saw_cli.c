@@ -1,78 +1,60 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <string.h>
+#include<stdio.h>
+#include<unistd.h>
+#include<arpa/inet.h>
 
-#define PORT 8080
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Usage: %s <total_frames>\n", argv[0]);
-        return 1;
-    }
+int main()
+{
+    int s,f=0,total,ack,n;
 
-    int total_frames = atoi(argv[1]);
-    int sockfd;
-    struct sockaddr_in server_addr;
-    socklen_t addr_len = sizeof(server_addr);
+    struct sockaddr_in a;
 
-    // Create a UDP socket (connectionless communication)
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("Socket error");
-        exit(1);
-    }
+    socklen_t l;
 
-    // Configure server address (IP + Port)
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);                 // Convert port to network byte order
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Convert IP to binary form
+    struct timeval t;
 
-    // Set receive timeout for socket (important for retransmission)
-    struct timeval tv;
-    tv.tv_sec = 2;
-    tv.tv_usec = 0;
+    printf("Enter total frames: ");
+    scanf("%d",&total);
 
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    s=socket(AF_INET,SOCK_DGRAM,0);
 
-    int next_frame = 0;
+    a.sin_family=AF_INET;
+    a.sin_port=htons(5000);
+    a.sin_addr.s_addr=inet_addr("127.0.0.1");
 
-    while (next_frame < total_frames) {
-        printf("Sending Frame: %d\n", next_frame);
+    t.tv_sec=2;
+    t.tv_usec=0;
 
-        // Send frame to server (no connection required in UDP)
-        sendto(sockfd, &next_frame, sizeof(next_frame), 0,
-               (struct sockaddr*)&server_addr, addr_len);
+    setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t));
 
-        int ack_frame;
+    l=sizeof(a);
 
-        // Receive ACK/NAK from server
-        int n = recvfrom(sockfd, &ack_frame, sizeof(ack_frame), 0, NULL, NULL);
+    while(f<total)
+    {
+        printf("Sending Frame: %d\n",f);
 
-        if (n < 0) {
-            // Timeout occurred (no response received)
-            printf("Timeout! Resending Frame %d\n", next_frame);
+        sendto(s,&f,sizeof(f),0,(struct sockaddr*)&a,l);
+
+        n=recvfrom(s,&ack,sizeof(ack),0,NULL,NULL);
+
+        if(n<0)
+        {
+            printf("Timeout! Resending Frame %d\n",f);
             continue;
         }
 
-        if (ack_frame == -1) {
-            // NAK received → resend same frame
-            printf("Received NAK for Frame %d\n", next_frame);
+        if(ack==-1)
+        {
+            printf("Received NAK for Frame %d\n",f);
             continue;
         }
 
-        if (ack_frame == next_frame + 1) {
-            // ACK received → move to next frame
-            printf("Received ACK: %d\n", ack_frame);
-            next_frame++;
-        }
+        printf("Received ACK: %d\n",ack);
+
+        f++;
     }
 
-    // Close UDP socket
-    close(sockfd);
+    close(s);
 
     return 0;
 }
